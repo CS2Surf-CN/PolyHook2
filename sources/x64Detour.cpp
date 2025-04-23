@@ -426,30 +426,41 @@ bool x64Detour::unHook() {
  * we also need to store it: `add rax, rbx` && `mov [r15], rax`, where as in cmp instruction for
  * instance there is no such requirement.
  */
-const static std::set<string> instructions_to_store{ // NOLINT(cert-err58-cpp)
-    "adc", "add", "and", "bsf", "bsr", "btc", "btr", "bts",
-    "cmovb", "cmove", "cmovl", "cmovle", "cmovnb", "cmovnbe", "cmovnl", "cmovnle",
-    "cmovno", "cmovnp", "cmovns", "cmovnz", "cmovo", "cmovp", "cmovs", "cmovz",
-    "cmpxchg", "crc32", "cvtsi2sd", "cvtsi2ss", "dec", "extractps", "inc", "mov",
-    "neg", "not", "or", "pextrb", "pextrd", "pextrq", "rcl", "rcr", "rol", "ror",
-    "sal", "sar", "sbb", "setb", "setbe", "setl", "setle", "setnb", "setnbe", "setnl",
-    "setnle", "setno", "setnp", "setns", "setnz", "seto", "setp", "sets", "setz", "shl",
-    "shld", "shr", "shrd", "sub", "verr", "verw", "xadd", "xchg", "xor"
+const static std::set<string>& instructions_to_store() { // NOLINT(cert-err58-cpp)
+    const static std::set<string> ins {"adc", "add", "and", "bsf", "bsr", "btc", "btr", "bts",
+        "cmovb", "cmove", "cmovl", "cmovle", "cmovnb", "cmovnbe", "cmovnl", "cmovnle",
+        "cmovno", "cmovnp", "cmovns", "cmovnz", "cmovo", "cmovp", "cmovs", "cmovz",
+        "cmpxchg", "crc32", "cvtsi2sd", "cvtsi2ss", "dec", "extractps", "inc", "mov",
+        "neg", "not", "or", "pextrb", "pextrd", "pextrq", "rcl", "rcr", "rol", "ror",
+        "sal", "sar", "sbb", "setb", "setbe", "setl", "setle", "setnb", "setnbe", "setnl",
+        "setnle", "setno", "setnp", "setns", "setnz", "seto", "setp", "sets", "setz", "shl",
+        "shld", "shr", "shrd", "sub", "verr", "verw", "xadd", "xchg", "xor"
+    };
+
+    return ins;
 };
 
-const static std::map<ZydisRegister, ZydisRegister> a_to_b{ // NOLINT(cert-err58-cpp)
-    {ZYDIS_REGISTER_RAX, ZYDIS_REGISTER_RBX},
-    {ZYDIS_REGISTER_EAX, ZYDIS_REGISTER_EBX},
-    {ZYDIS_REGISTER_AX,  ZYDIS_REGISTER_BX},
-    {ZYDIS_REGISTER_AH,  ZYDIS_REGISTER_BH},
-    {ZYDIS_REGISTER_AL,  ZYDIS_REGISTER_BL},
+const static std::map<ZydisRegister, ZydisRegister>& a_to_b() {
+    const static std::map<ZydisRegister, ZydisRegister> sm_a_to_b{ // NOLINT(cert-err58-cpp)
+        {ZYDIS_REGISTER_RAX, ZYDIS_REGISTER_RBX},
+        {ZYDIS_REGISTER_EAX, ZYDIS_REGISTER_EBX},
+        {ZYDIS_REGISTER_AX,  ZYDIS_REGISTER_BX},
+        {ZYDIS_REGISTER_AH,  ZYDIS_REGISTER_BH},
+        {ZYDIS_REGISTER_AL,  ZYDIS_REGISTER_BL},
+    };
+
+    return sm_a_to_b;
 };
 
-const static std::map<ZydisRegisterClass, ZydisRegister> class_to_reg{ // NOLINT(cert-err58-cpp)
-    {ZYDIS_REGCLASS_GPR64, ZYDIS_REGISTER_RAX},
-    {ZYDIS_REGCLASS_GPR32, ZYDIS_REGISTER_EAX},
-    {ZYDIS_REGCLASS_GPR16, ZYDIS_REGISTER_AX},
-    {ZYDIS_REGCLASS_GPR8,  ZYDIS_REGISTER_AL},
+const static std::map<ZydisRegisterClass, ZydisRegister>& class_to_reg() {
+    const static std::map<ZydisRegisterClass, ZydisRegister> sm_class_to_reg{ // NOLINT(cert-err58-cpp)
+        {ZYDIS_REGCLASS_GPR64, ZYDIS_REGISTER_RAX},
+        {ZYDIS_REGCLASS_GPR32, ZYDIS_REGISTER_EAX},
+        {ZYDIS_REGCLASS_GPR16, ZYDIS_REGISTER_AX},
+        {ZYDIS_REGCLASS_GPR8,  ZYDIS_REGISTER_AL},
+    };
+
+    return sm_class_to_reg;
 };
 
 /**
@@ -457,18 +468,22 @@ const static std::map<ZydisRegisterClass, ZydisRegister> class_to_reg{ // NOLINT
  * This map translates all possible scratch registers into
  * the corresponding 64-bit register for push/pop operations.
  */
-const static std::map<string, string> scratch_to_64{ // NOLINT(cert-err58-cpp)
-    {"rbx", "rbx"},
-    {"ebx", "rbx"},
-    {"bx",  "rbx"},
-    {"bh",  "rbx"},
-    {"bl",  "rbx"},
-    {"rax", "rax"},
-    {"eax", "rax"},
-    {"ax",  "rax"},
-    {"ah",  "rax"},
-    {"al",  "rax"},
-};
+const static std::map<string, string>& scratch_to_64() {
+    const static std::map<string, string> sm_scratch_to_64{ // NOLINT(cert-err58-cpp)
+        {"rbx", "rbx"},
+        {"ebx", "rbx"},
+        {"bx",  "rbx"},
+        {"bh",  "rbx"},
+        {"bl",  "rbx"},
+        {"rax", "rax"},
+        {"eax", "rax"},
+        {"ax",  "rax"},
+        {"ah",  "rax"},
+        {"al",  "rax"},
+    };
+
+    return sm_scratch_to_64;
+}
 
 struct TranslationResult {
     string instruction;
@@ -522,12 +537,12 @@ optional<TranslationResult> translate_instruction(const Instruction& instruction
         const auto regClass = ZydisRegisterGetClass(reg);
         const string reg_string = ZydisRegisterGetString(reg);
 
-        if (a_to_b.count(reg)) {
+        if (a_to_b().count(reg)) {
             // This is a register A
-            scratch_register = a_to_b.at(reg);
-        } else if (class_to_reg.count(regClass)) {
+            scratch_register = a_to_b().at(reg);
+        } else if (class_to_reg().count(regClass)) {
             // This is not a register A
-            scratch_register = class_to_reg.at(regClass);
+            scratch_register = class_to_reg().at(regClass);
         } else {
             // Unexpected register
             Log::log("Unexpected register: " + reg_string, ErrorLevel::SEV);
@@ -536,7 +551,7 @@ optional<TranslationResult> translate_instruction(const Instruction& instruction
 
         scratch_register_string = ZydisRegisterGetString(scratch_register);
 
-        if (!scratch_to_64.count(scratch_register_string)) {
+        if (!scratch_to_64().count(scratch_register_string)) {
             Log::log("Unexpected scratch register: " + scratch_register_string, ErrorLevel::SEV);
             return {};
         }
@@ -613,7 +628,7 @@ optional<uint64_t> x64Detour::generateTranslationRoutine(const Instruction& inst
 
         auto [translated_instruction, scratch_register, address_register] = *result;
 
-        const auto& scratch_register_64 = scratch_to_64.at(scratch_register);
+        const auto& scratch_register_64 = scratch_to_64().at(scratch_register);
 
         // Save the scratch register
         translation.emplace_back("push " + scratch_register_64);
@@ -632,7 +647,7 @@ optional<uint64_t> x64Detour::generateTranslationRoutine(const Instruction& inst
         translation.emplace_back(translated_instruction);
 
         // Store the scratch register content into the destination, if necessary
-        if (instruction.startsWithDisplacement() && instructions_to_store.count(instruction.getMnemonic())) {
+        if (instruction.startsWithDisplacement() && instructions_to_store().count(instruction.getMnemonic())) {
             translation.emplace_back("mov [" + address_register + "], " + scratch_register_64);
         }
 
